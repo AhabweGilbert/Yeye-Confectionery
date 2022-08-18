@@ -1,0 +1,79 @@
+                    this.rs = metaData.getTablePrivileges(null, this.dbName, tablePattern);
+                    testGetTablePrivileges_checkResult(dbMapsToSchema, tableName);
+
+                    this.rs = metaData.getTablePrivileges(this.dbName, null, tablePattern);
+                    testGetTablePrivileges_checkResult(dbMapsToSchema, tableName);
+
+                    if (dbMapsToSchema) {
+                        String dbPattern = conn1.getSchema().substring(0, conn1.getSchema().length() - 1) + "%";
+                        this.rs = metaData.getTablePrivileges(null, dbPattern, tablePattern);
+                        assertTrue(this.rs.next(), "Schema pattern " + dbPattern + " should be recognized.");
+                    } else {
+                        String dbPattern = conn1.getCatalog().substring(0, conn1.getCatalog().length() - 1) + "%";
+                        this.rs = metaData.getTablePrivileges(dbPattern, null, tablePattern);
+                        assertFalse(this.rs.next(), "Catalog pattern " + dbPattern + " should not be recognized.");
+                    }
+
+                } finally {
+                    if (conn1 != null) {
+                        conn1.close();
+                    }
+                }
+            }
+        }
+    }
+
+    private void testGetTablePrivileges_checkResult(boolean dbMapsToSchema, String tableName) throws Exception {
+        assertTrue(this.rs.next());
+        if (dbMapsToSchema) {
+            assertEquals("def", this.rs.getString("TABLE_CAT"));
+            assertEquals(this.dbName, this.rs.getString("TABLE_SCHEM"));
+        } else {
+            assertEquals(this.dbName, this.rs.getString("TABLE_CAT"));
+            assertNull(this.rs.getString("TABLE_SCHEM"));
+        }
+        assertEquals(tableName, this.rs.getString("TABLE_NAME"));
+        assertTrue(this.rs.getString("GRANTOR").startsWith(mainConnectionUrl.getMainHost().getUser()));
+        assertEquals("testGTPUser@%", this.rs.getString("GRANTEE"));
+        assertEquals("SELECT", this.rs.getString("PRIVILEGE"));
+        assertNull(this.rs.getString("IS_GRANTABLE"));
+        assertFalse(this.rs.next());
+    }
+
+    @Test
+    public void testGetBestRowIdentifier() throws Exception {
+        String tableName = "testGetBestRowIdentifier";
+        createTable(tableName, "(field1 INT NOT NULL PRIMARY KEY)");
+
+        Properties props = new Properties();
+        props.setProperty(PropertyKey.sslMode.getKeyName(), "DISABLED");
+        props.setProperty(PropertyKey.allowPublicKeyRetrieval.getKeyName(), "true");
+        for (boolean useIS : new boolean[] { false, true }) {
+            for (boolean dbMapsToSchema : new boolean[] { false, true }) {
+                props.setProperty(PropertyKey.useInformationSchema.getKeyName(), "" + useIS);
+                props.setProperty(PropertyKey.databaseTerm.getKeyName(), dbMapsToSchema ? DatabaseTerm.SCHEMA.name() : DatabaseTerm.CATALOG.name());
+
+                System.out.println("useIS=" + useIS + ", dbMapsToSchema=" + dbMapsToSchema);
+
+                Connection conn1 = null;
+                try {
+
+                    conn1 = getConnectionWithProps(props);
+                    DatabaseMetaData metaData = conn1.getMetaData();
+
+                    this.rs = metaData.getBestRowIdentifier(null, null, tableName, DatabaseMetaData.bestRowNotPseudo, true);
+                    testGetBestRowIdentifier_checkResult(this.rs);
+
+                    this.rs = metaData.getBestRowIdentifier(null, this.dbName, tableName, DatabaseMetaData.bestRowNotPseudo, true);
+                    testGetBestRowIdentifier_checkResult(this.rs);
+
+                    this.rs = metaData.getBestRowIdentifier(this.dbName, null, tableName, DatabaseMetaData.bestRowNotPseudo, true);
+                    testGetBestRowIdentifier_checkResult(this.rs);
+
+                    if (dbMapsToSchema) {
+                        String dbPattern = conn1.getSchema().substring(0, conn1.getSchema().length() - 1) + "%";
+                        this.rs = metaData.getBestRowIdentifier(null, dbPattern, tableName, DatabaseMetaData.bestRowNotPseudo, true);
+                        assertFalse(this.rs.next(), "Schema pattern " + dbPattern + " should not be recognized.");
+                    } else {
+                        String dbPattern = conn1.getCatalog().substring(0, conn1.getCatalog().length() - 1) + "%";
+                        this.rs = metaData.getBestRowIdentifier(dbPattern, null, tableName, DatabaseMetaData.bestRowNotP
